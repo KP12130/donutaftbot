@@ -39,7 +39,7 @@ function createMCBot() {
         console.log('MC Bot bent van a szerveren!');
         setTimeout(() => {
             if (isStopping || !mcBot) return;
-            mcBot.chat('/afk 70');
+            mcBot.chat('/afk 56');
             setTimeout(() => {
                 if (isStopping || !mcBot) return;
                 isJumping = true;
@@ -97,3 +97,4 @@ client.once('ready', () => {
 // Indítás
 client.login(DISCORD_TOKEN);
 createMCBot();
+
