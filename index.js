@@ -62,13 +62,17 @@ function createBot() {
         }
 
         // SIKERES TELEPORT FIGYELÉSE
-        if (message.includes('You teleported to the AFK')) {
+        // Frissítve: Figyeli a normál "AFK" és a szerver által használt speciális "ᴀꜰᴋ" karaktereket is
+        if (message.includes('You teleported to the AFK') || message.includes('You teleported to the ᴀꜰᴋ')) {
             console.log('>>> SIKER! Megkezdődött a teleportálás az AFK zónába.');
             isTeleporting = true;
             inAfkZone = true;
             
-            // Leállítjuk a keresést, hogy ne küldjön több parancsot
-            if (searchTimer) clearInterval(searchTimer);
+            // Azonnal leállítjuk a keresést
+            if (searchTimer) {
+                clearInterval(searchTimer);
+                searchTimer = null;
+            }
 
             // 7 másodperces teljes mozdulatlanság, hogy a TP ne szakadjon meg
             setTimeout(() => {
@@ -82,9 +86,12 @@ function createBot() {
             if (inAfkZone) {
                 console.log('Valami hiba történt vagy kidobtak. Keresés újraindítása...');
                 inAfkZone = false;
-                // Itt nem kell újraindítani a setInterval-t, mert ha inAfkZone hamis, 
-                // a meglévő interval (ha nem töröltük) vagy egy új hívás folytatja.
-                // Biztonság kedvéért hívjuk meg a spawn-nál lévő logikát ha nincs timer.
+                isTeleporting = false;
+                
+                // Ha nincs aktív kereső, indítsuk újra a logikát
+                if (!searchTimer) {
+                    bot.emit('spawn');
+                }
             }
         }
     });
