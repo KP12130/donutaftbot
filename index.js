@@ -31,8 +31,8 @@ function createBot() {
 
         // Várunk egy kicsit a belépés után, mielőtt elküldjük a parancsot
         setTimeout(() => {
-            console.log('Parancs küldése: /afk 70');
-            bot.chat('/afk 70');
+            console.log('Parancs küldése: /afk 56');
+            bot.chat('/afk 56');
 
             // 10 másodperc várakozás a teleportra, utána kezdődik az ugrálás
             console.log('Várakozás 10 másodpercig a teleportálásra...');
@@ -72,3 +72,4 @@ function createBot() {
 
 // Bot indítása
 createBot();
+
