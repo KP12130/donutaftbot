@@ -1,92 +1,118 @@
 const mineflayer = require('mineflayer');
 const http = require('http');
 
-http.createServer((req, res) => {
-  res.write('A bot fut!');
-  res.end();
-}).listen(process.env.PORT || 3000);
+// --- RENDER ÉBREN TARTÁS (WEB SERVER) ---
+// Ez szükséges, hogy a Render ingyenes szintjén ne álljon le a folyamat
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot is running and farming shards!\n');
+});
 
-const botArgs = {
+server.listen(process.env.PORT || 3000, () => {
+    console.log(`Web szerver fut a porton: ${process.env.PORT || 3000}`);
+});
+
+// --- BOT KONFIGURÁCIÓ ---
+const options = {
     host: 'donutsmp.net',
-    username: 'KP12130',
+    username: 'Patrik12130', // Microsoft email vagy username (auth: microsoft esetén a login során dől el)
     auth: 'microsoft',
     version: '1.20.4'
 };
 
-const createBot = () => {
-    const bot = mineflayer.createBot(botArgs);
-    let afkAttemptCounter = 1;
+function createBot() {
+    console.log('Bot indítása...');
+    const bot = mineflayer.createBot(options);
+
+    let afkAttemptCounter = 20; // 20-as szobától indul
     let inAfkZone = false;
-    let isTeleporting = false; // Új változó a teleportálási időhöz
+    let isTeleporting = false;
     let searchTimer = null;
 
     bot.on('spawn', () => {
-        console.log('Bot belépett. Kezdem a keresést...');
+        console.log('Bot belépett a lobbyba! AFK keresés indítása 20-as szobától...');
         inAfkZone = false;
         isTeleporting = false;
-        afkAttemptCounter = 1;
+        afkAttemptCounter = 20;
 
-        startSearching();
-    });
-
-    function startSearching() {
+        // Töröljük a korábbi időzítőt, ha van
         if (searchTimer) clearInterval(searchTimer);
+
+        // 10 másodpercenként próbálkozik
         searchTimer = setInterval(() => {
             if (!inAfkZone && !isTeleporting) {
-                console.log(`Próbálkozás: /afk ${afkAttemptCounter}`);
+                console.log(`Keresés: /afk ${afkAttemptCounter}`);
                 bot.chat(`/afk ${afkAttemptCounter}`);
                 
+                // Következő szoba kiválasztása (1-38 között körforgásban)
                 afkAttemptCounter++;
-                if (afkAttemptCounter > 38) afkAttemptCounter = 1;
+                if (afkAttemptCounter > 38) {
+                    afkAttemptCounter = 1;
+                }
             }
-        }, 1200); // 1.2 mp delay, hogy biztosan ne spameld túl
-    }
+        }, 10000); // 10 másodperces várakozás a próbálkozások között
+    });
 
     bot.on('message', (jsonMsg) => {
         const message = jsonMsg.toString();
         
-        // Ha elindult a teleportálás
+        // Logoljuk a szerver üzeneteit a konzolra (Render Logs-ban látni fogod)
+        if (message.trim().length > 0) {
+            console.log(`[Szerver] ${message}`);
+        }
+
+        // SIKERES TELEPORT FIGYELÉSE
         if (message.includes('You teleported to the AFK')) {
-            console.log('Sikerült! Várakozás 5 másodpercig (mozdulatlanság)...');
+            console.log('>>> SIKER! Megkezdődött a teleportálás az AFK zónába.');
             isTeleporting = true;
             inAfkZone = true;
+            
+            // Leállítjuk a keresést, hogy ne küldjön több parancsot
             if (searchTimer) clearInterval(searchTimer);
 
-            // 6 másodpercre állítom a biztonság kedvéért, utána kezdheti az anti-AFK-t
+            // 7 másodperces teljes mozdulatlanság, hogy a TP ne szakadjon meg
             setTimeout(() => {
-                console.log('Teleportálás kész, bot aktív az AFK zónában.');
+                console.log('>>> Teleportálás befejezve. Bot aktív az AFK zónában.');
                 isTeleporting = false;
-            }, 6000);
+            }, 7000);
         }
 
-        // Ha tele van a szoba vagy hiba van, folytassa a keresést
-        if (message.includes('full') || message.includes('error')) {
-            isTeleporting = false;
-            inAfkZone = false;
-        }
-    });
-
-    // Anti-AFK rutin (csak ha már bent van és nem teleportál éppen)
-    setInterval(() => {
-        if (inAfkZone && !isTeleporting) {
-            // Véletlenszerű mozgás: ugrás vagy fejmozgatás
-            const rand = Math.random();
-            if (rand < 0.5) {
-                bot.setControlState('jump', true);
-                setTimeout(() => bot.setControlState('jump', false), 500);
-            } else {
-                bot.look(Math.random() * Math.PI, (Math.random() - 0.5) * Math.PI);
+        // Ha kidobna a szobából vagy nem sikerülne (pl. tele van)
+        if (message.includes('full') || message.includes('is full') || message.includes('kick')) {
+            if (inAfkZone) {
+                console.log('Valami hiba történt vagy kidobtak. Keresés újraindítása...');
+                inAfkZone = false;
+                // Itt nem kell újraindítani a setInterval-t, mert ha inAfkZone hamis, 
+                // a meglévő interval (ha nem töröltük) vagy egy új hívás folytatja.
+                // Biztonság kedvéért hívjuk meg a spawn-nál lévő logikát ha nincs timer.
             }
         }
-    }, 40000); // 40 másodpercenként
-
-    bot.on('end', () => {
-        console.log('Lecsatlakozva. Újraindítás 10 mp múlva...');
-        if (searchTimer) clearInterval(searchTimer);
-        setTimeout(createBot, 10000);
     });
 
-    bot.on('error', err => console.log('Hiba:', err));
-};
+    // ANTI-AFK MOZGÁS (Csak ha már bent van a zónában és nem teleportál éppen)
+    setInterval(() => {
+        if (inAfkZone && !isTeleporting) {
+            // Egy kis ugrás és fejmozgás, hogy ne dobjon ki a rendszer
+            bot.setControlState('jump', true);
+            setTimeout(() => bot.setControlState('jump', false), 500);
+            
+            const yaw = Math.random() * Math.PI * 2;
+            const pitch = (Math.random() - 0.5) * Math.PI;
+            bot.look(yaw, pitch);
+        }
+    }, 30000); // 30 másodpercenként mozog
 
+    // HIBAKEZELÉS ÉS ÚJRAINDÍTÁS
+    bot.on('error', (err) => {
+        console.log(`Hiba történt: ${err.message}`);
+    });
+
+    bot.on('end', () => {
+        console.log('Bot lecsatlakozott. Újracsatlakozás 15 másodperc múlva...');
+        if (searchTimer) clearInterval(searchTimer);
+        setTimeout(createBot, 15000);
+    });
+}
+
+// Bot indítása
 createBot();
