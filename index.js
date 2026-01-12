@@ -14,7 +14,7 @@ server.listen(process.env.PORT || 3000, () => {
 
 // --- DISCORD BOT BEÁLLÍTÁSA ---
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN; 
-const LOG_CHANNEL_ID = 'IDE_MÁSOLD_A_CSATORNA_ID_T'; // Ide írd annak a csatornának az ID-jét, ahová a logokat szeretnéd
+const LOG_CHANNEL_ID = '1459574891559780515'; // Ide írd annak a csatornának az ID-jét, ahová a logokat szeretnéd
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
@@ -119,3 +119,4 @@ client.once('ready', () => {
 // Indítás
 client.login(DISCORD_TOKEN);
 createMCBot();
+
