@@ -13,13 +13,15 @@ server.listen(process.env.PORT || 3000, () => {
 });
 
 // --- DISCORD BOT BEÁLLÍTÁSA ---
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN; // Render Environment Variables-nél add meg!
+const DISCORD_TOKEN = process.env.DISCORD_TOKEN; 
+const LOG_CHANNEL_ID = 'IDE_MÁSOLD_A_CSATORNA_ID_T'; // Ide írd annak a csatornának az ID-jét, ahová a logokat szeretnéd
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 // --- MC BOT KONFIGURÁCIÓ ---
 const options = {
     host: 'donutsmp.net',
-    username: 'Patrik12130',
+    username: 'KP12130',
     auth: 'microsoft',
     version: '1.20.4'
 };
@@ -28,22 +30,38 @@ let mcBot = null;
 let isStopping = false;
 let isJumping = false;
 
+// Segédfüggvény a logoláshoz Discordra és Konzolra
+async function discordLog(message) {
+    console.log(message);
+    try {
+        const channel = await client.channels.fetch(LOG_CHANNEL_ID);
+        if (channel) {
+            await channel.send(`\`[${new Date().toLocaleTimeString()}]\` ${message}`);
+        }
+    } catch (err) {
+        console.error('Hiba a Discord logolás közben:', err.message);
+    }
+}
+
 function createMCBot() {
     if (isStopping) return;
 
-    console.log('Minecraft bot indítása...');
+    discordLog('🚀 Minecraft bot indítása...');
     mcBot = mineflayer.createBot(options);
     isJumping = false;
 
     mcBot.on('spawn', () => {
-        console.log('MC Bot bent van a szerveren!');
+        discordLog('✅ MC Bot sikeresen bent van a szerveren!');
+        
         setTimeout(() => {
             if (isStopping || !mcBot) return;
-            mcBot.chat('/afk 56');
+            discordLog('💬 Parancs küldése: /afk 70');
+            mcBot.chat('/afk 70');
+            
             setTimeout(() => {
                 if (isStopping || !mcBot) return;
                 isJumping = true;
-                console.log('Ugrálás aktiválva.');
+                discordLog('🏃 Ugrálás aktiválva és üzemkész.');
             }, 10000);
         }, 5000);
     });
@@ -55,27 +73,31 @@ function createMCBot() {
     });
 
     mcBot.on('end', () => {
-        console.log('MC Bot lecsatlakozott.');
+        discordLog('🔌 MC Bot lecsatlakozott a szerverről.');
         if (!isStopping) {
+            discordLog('🔄 Újracsatlakozás 15 másodperc múlva...');
             setTimeout(createMCBot, 15000);
         }
     });
 
-    mcBot.on('error', (err) => console.log('MC Hiba:', err));
+    mcBot.on('error', (err) => {
+        discordLog(`❌ MC Hiba történt: ${err.message}`);
+    });
 }
 
 // --- DISCORD PARANCSOK ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Egyszerű szöveges parancsok (pl. !start, !stop)
     if (message.content === '!start') {
-        if (isStopping || mcBot) {
+        if (isStopping || !mcBot) {
             isStopping = false;
-            if (!mcBot) createMCBot();
-            return message.reply('Minecraft bot indítása folyamatban...');
+            if (!mcBot) {
+                createMCBot();
+                return message.reply('▶️ Minecraft bot indítási folyamata elindítva.');
+            }
         }
-        message.reply('A bot már fut vagy indul!');
+        message.reply('⚠️ A bot már fut vagy éppen csatlakozik!');
     }
 
     if (message.content === '!stop') {
@@ -84,9 +106,9 @@ client.on('messageCreate', async (message) => {
             isJumping = false;
             mcBot.quit();
             mcBot = null;
-            return message.reply('Minecraft bot leállítva és leléptetve.');
+            return message.reply('⏹️ Minecraft bot leállítva és kijelentkeztetve.');
         }
-        message.reply('A bot jelenleg nem fut.');
+        message.reply('❓ A bot jelenleg nem fut, így nem tudom leállítani.');
     }
 });
 
@@ -97,4 +119,3 @@ client.once('ready', () => {
 // Indítás
 client.login(DISCORD_TOKEN);
 createMCBot();
-
