@@ -85,8 +85,8 @@ function createMCBot() {
         
         setTimeout(() => {
             if (isStopping || !mcBot) return;
-            discordLog('💬 Parancs küldése: /afk 70');
-            mcBot.chat('/afk 70');
+            discordLog('💬 Parancs küldése: /afk 56');
+            mcBot.chat('/afk 56');
             
             setTimeout(() => {
                 if (isStopping || !mcBot) return;
@@ -155,3 +155,4 @@ client.once('ready', () => {
 
 client.login(DISCORD_TOKEN);
 createMCBot();
+
