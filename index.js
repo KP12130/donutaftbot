@@ -27,7 +27,7 @@ setInterval(() => {
 
 // --- DISCORD BOT BEÁLLÍTÁSA ---
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN; 
-const LOG_CHANNEL_ID = 'IDE_MÁSOLD_A_CSATORNA_ID_T'; 
+const LOG_CHANNEL_ID = '1459574891559780515'; 
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
@@ -155,4 +155,5 @@ client.once('ready', () => {
 
 client.login(DISCORD_TOKEN);
 createMCBot();
+
 
