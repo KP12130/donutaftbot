@@ -1,6 +1,6 @@
 const mineflayer = require('mineflayer');
 const http = require('http');
-const https = require('https'); // ÚJ: Szükséges a HTTPS pingeléshez
+const https = require('https');
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 
 // --- RENDER ÉBREN TARTÁS (WEB SERVER) ---
@@ -14,7 +14,7 @@ server.listen(PORT, () => {
     console.log(`Web szerver fut a porton: ${PORT}`);
 });
 
-// Belső "Self-Ping" javítva (kezeli a http és https-t is)
+// Belső "Self-Ping" a leállás megelőzésére
 setInterval(() => {
     const url = process.env.RENDER_EXTERNAL_URL;
     if (url) {
@@ -29,7 +29,7 @@ setInterval(() => {
 
 // --- DISCORD BOT BEÁLLÍTÁSA ---
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN; 
-const LOG_CHANNEL_ID = '1459574891559780515'; 
+const LOG_CHANNEL_ID = process.env.LOG_CHANNEL_ID || '1459574891559780515'; 
 
 const client = new Client({ 
     intents: [
@@ -51,9 +51,11 @@ const options = {
 
 let mcBot = null;
 let isStopping = false;
-let isJumping = false;
+let isAntiAfkActive = false;
 let reconnectTimeout = 15000;
+let antiAfkTimeout = null;
 
+// Segédfüggvény a logoláshoz Discordra és Konzolra
 async function discordLog(message) {
     console.log(message);
     if (!client.isReady()) return;
@@ -67,12 +69,46 @@ async function discordLog(message) {
     }
 }
 
+// Ritka és véletlenszerű Anti-AFK mozgás (AFK Arénához optimalizálva)
+function scheduleNextAction() {
+    if (antiAfkTimeout) clearTimeout(antiAfkTimeout);
+    if (!isAntiAfkActive || isStopping || !mcBot) return;
+
+    // 5 és 15 perc közötti várakozás (300.000 - 900.000 ms)
+    const nextInterval = Math.floor(Math.random() * (900000 - 300000 + 1)) + 300000;
+
+    antiAfkTimeout = setTimeout(() => {
+        if (mcBot && mcBot.entity) {
+            const action = Math.random();
+            
+            if (action < 0.2) { 
+                // 20% esély ugrásra
+                discordLog('💃 Anti-AFK: Kis ugrás...');
+                mcBot.setControlState('jump', true);
+                setTimeout(() => mcBot.setControlState('jump', false), 500);
+            } else if (action < 0.8) {
+                // 60% esély nézelődésre
+                discordLog('👀 Anti-AFK: Körbenézés...');
+                const yaw = mcBot.entity.yaw + (Math.random() - 0.5) * 3;
+                const pitch = (Math.random() - 0.5) * 1.5;
+                mcBot.look(yaw, pitch);
+            } else {
+                // 20% esély, hogy nem csinál semmit (még természetesebb)
+                discordLog('💤 Anti-AFK: Pihenő, nincs mozgás ebben a ciklusban.');
+            }
+        }
+        
+        // Következő akció ütemezése
+        scheduleNextAction();
+    }, nextInterval);
+}
+
 function createMCBot() {
     if (isStopping) return;
 
     console.log('🚀 Minecraft bot indítása...');
     mcBot = mineflayer.createBot(options);
-    isJumping = false;
+    isAntiAfkActive = false;
 
     mcBot.on('error', (err) => {
         if (err.code === 'Z_DATA_ERROR' || err.message.includes('inflating chunk')) {
@@ -88,31 +124,23 @@ function createMCBot() {
         discordLog('✅ MC Bot sikeresen bent van a szerveren!');
         reconnectTimeout = 15000;
         
+        // Belépés után várunk egy kicsit, majd indítjuk a ritka mozgást
         setTimeout(() => {
             if (isStopping || !mcBot) return;
-            discordLog('💬 Parancs küldése: /afk 70');
-            mcBot.chat('/afk 70');
-            
-            setTimeout(() => {
-                if (isStopping || !mcBot) return;
-                isJumping = true;
-                discordLog('🏃 Ugrálás aktiválva.');
-            }, 10000);
-        }, 5000);
-    });
-
-    mcBot.on('physicsTick', () => {
-        if (mcBot && isJumping && !isStopping) {
-            mcBot.setControlState('jump', true);
-        }
+            isAntiAfkActive = true;
+            scheduleNextAction();
+            discordLog('🏃 Anti-AFK (ritka mozgás) aktiválva (5-15 percenként).');
+        }, 10000);
     });
 
     mcBot.on('end', (reason) => {
         discordLog(`🔌 MC Bot lecsatlakozott. Indok: ${reason}`);
+        if (antiAfkTimeout) clearTimeout(antiAfkTimeout);
+        
         if (!isStopping) {
             if (reason.includes('already connected') || reason.includes('logged in')) {
                 reconnectTimeout = 60000;
-                discordLog('⏳ Karakter bent ragadt. Várok 1 percet...');
+                discordLog('⏳ Ghost Session érzékelve. Várok 1 percet...');
             } else {
                 reconnectTimeout = 15000;
                 discordLog(`🔄 Újracsatlakozás ${reconnectTimeout / 1000} mp múlva...`);
@@ -131,7 +159,7 @@ client.on(Events.MessageCreate, async (message) => {
             isStopping = false;
             if (!mcBot) {
                 createMCBot();
-                return message.reply('▶️ Minecraft bot indítása...');
+                return message.reply('▶️ Minecraft bot indítása folyamatban...');
             }
         }
         message.reply('⚠️ A bot már fut!');
@@ -140,7 +168,8 @@ client.on(Events.MessageCreate, async (message) => {
     if (message.content === '!stop') {
         if (mcBot) {
             isStopping = true;
-            isJumping = false;
+            isAntiAfkActive = false;
+            if (antiAfkTimeout) clearTimeout(antiAfkTimeout);
             mcBot.quit();
             mcBot = null;
             return message.reply('⏹️ Minecraft bot leállítva.');
@@ -149,7 +178,7 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     if (message.content === '!kick') {
-        await message.reply('💀 Folyamat leállítása...');
+        await message.reply('💀 Folyamat kényszerített leállítása...');
         process.exit(0); 
     }
 });
@@ -158,6 +187,5 @@ client.once(Events.ClientReady, () => {
     console.log(`Discord bot online: ${client.user.tag}`);
 });
 
-// Indítás
 client.login(DISCORD_TOKEN);
 createMCBot();
