@@ -83,18 +83,14 @@ function scheduleNextAction() {
             
             if (action < 0.2) { 
                 // 20% esély ugrásra
-                discordLog('💃 Anti-AFK: Kis ugrás...');
                 mcBot.setControlState('jump', true);
                 setTimeout(() => mcBot.setControlState('jump', false), 500);
             } else if (action < 0.8) {
                 // 60% esély nézelődésre
-                discordLog('👀 Anti-AFK: Körbenézés...');
                 const yaw = mcBot.entity.yaw + (Math.random() - 0.5) * 3;
                 const pitch = (Math.random() - 0.5) * 1.5;
                 mcBot.look(yaw, pitch);
             } else {
-                // 20% esély, hogy nem csinál semmit (még természetesebb)
-                discordLog('💤 Anti-AFK: Pihenő, nincs mozgás ebben a ciklusban.');
             }
         }
         
@@ -189,3 +185,4 @@ client.once(Events.ClientReady, () => {
 
 client.login(DISCORD_TOKEN);
 createMCBot();
+
